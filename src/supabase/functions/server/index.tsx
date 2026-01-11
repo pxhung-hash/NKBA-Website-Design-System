@@ -381,4 +381,242 @@ app.post("/make-server-f61d8c0d/auth/create-vault-admin", async (c) => {
   }
 });
 
+// ============================================================
+// STRATEGY VAULT MANAGEMENT ROUTES
+// ============================================================
+
+// Get all strategies
+app.get("/make-server-f61d8c0d/strategies", async (c) => {
+  try {
+    console.log('=== GET ALL STRATEGIES ===');
+    
+    // Get all strategies from KV store
+    const strategies = await kv.getByPrefix('strategy:');
+    
+    console.log(`Retrieved ${strategies.length} strategies`);
+    
+    return c.json({
+      success: true,
+      strategies: strategies,
+    });
+  } catch (error) {
+    console.error('Error fetching strategies:', error);
+    return c.json({ 
+      error: "Error fetching strategies: " + (error instanceof Error ? error.message : 'Unknown error') 
+    }, 500);
+  }
+});
+
+// Get a single strategy by ID
+app.get("/make-server-f61d8c0d/strategies/:id", async (c) => {
+  try {
+    const id = c.req.param('id');
+    console.log(`=== GET STRATEGY ${id} ===`);
+    
+    const strategy = await kv.get(`strategy:${id}`);
+    
+    if (!strategy) {
+      return c.json({ error: "Strategy not found" }, 404);
+    }
+    
+    return c.json({
+      success: true,
+      strategy: strategy,
+    });
+  } catch (error) {
+    console.error('Error fetching strategy:', error);
+    return c.json({ 
+      error: "Error fetching strategy: " + (error instanceof Error ? error.message : 'Unknown error') 
+    }, 500);
+  }
+});
+
+// Create a new strategy
+app.post("/make-server-f61d8c0d/strategies", async (c) => {
+  try {
+    console.log('=== CREATE NEW STRATEGY ===');
+    const body = await c.req.json();
+    const { id, category, name, version, createdDate, url, status } = body;
+    
+    // Validate required fields
+    if (!id || !name) {
+      return c.json({ error: "Missing required fields: id and name are required" }, 400);
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    const strategy = {
+      id,
+      category: category || 'Brand Identity',
+      name,
+      version: version || '1.0',
+      createdDate: createdDate || today,
+      updatedDate: today,
+      url: url || '',
+      status: status || 'draft',
+    };
+    
+    // Save to KV store
+    await kv.set(`strategy:${id}`, strategy);
+    
+    console.log(`Strategy ${id} created successfully`);
+    
+    return c.json({
+      success: true,
+      message: "Strategy created successfully",
+      strategy: strategy,
+    });
+  } catch (error) {
+    console.error('Error creating strategy:', error);
+    return c.json({ 
+      error: "Error creating strategy: " + (error instanceof Error ? error.message : 'Unknown error') 
+    }, 500);
+  }
+});
+
+// Update a strategy
+app.put("/make-server-f61d8c0d/strategies/:id", async (c) => {
+  try {
+    const id = c.req.param('id');
+    console.log(`=== UPDATE STRATEGY ${id} ===`);
+    
+    const body = await c.req.json();
+    
+    // Get existing strategy
+    const existingStrategy = await kv.get(`strategy:${id}`);
+    if (!existingStrategy) {
+      return c.json({ error: "Strategy not found" }, 404);
+    }
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Update strategy with new data
+    const updatedStrategy = {
+      ...existingStrategy,
+      ...body,
+      id, // Ensure ID doesn't change
+      updatedDate: today,
+    };
+    
+    // Save updated strategy
+    await kv.set(`strategy:${id}`, updatedStrategy);
+    
+    console.log(`Strategy ${id} updated successfully`);
+    
+    return c.json({
+      success: true,
+      message: "Strategy updated successfully",
+      strategy: updatedStrategy,
+    });
+  } catch (error) {
+    console.error('Error updating strategy:', error);
+    return c.json({ 
+      error: "Error updating strategy: " + (error instanceof Error ? error.message : 'Unknown error') 
+    }, 500);
+  }
+});
+
+// Delete a strategy
+app.delete("/make-server-f61d8c0d/strategies/:id", async (c) => {
+  try {
+    const id = c.req.param('id');
+    console.log(`=== DELETE STRATEGY ${id} ===`);
+    
+    // Check if strategy exists
+    const existingStrategy = await kv.get(`strategy:${id}`);
+    if (!existingStrategy) {
+      return c.json({ error: "Strategy not found" }, 404);
+    }
+    
+    // Delete from KV store
+    await kv.del(`strategy:${id}`);
+    
+    console.log(`Strategy ${id} deleted successfully`);
+    
+    return c.json({
+      success: true,
+      message: "Strategy deleted successfully",
+    });
+  } catch (error) {
+    console.error('Error deleting strategy:', error);
+    return c.json({ 
+      error: "Error deleting strategy: " + (error instanceof Error ? error.message : 'Unknown error') 
+    }, 500);
+  }
+});
+
+// Get all categories
+app.get("/make-server-f61d8c0d/categories", async (c) => {
+  try {
+    console.log('=== GET ALL CATEGORIES ===');
+    
+    // Get categories list from KV store
+    const categoriesData = await kv.get('strategy:categories');
+    
+    const defaultCategories = [
+      'Brand Identity',
+      'Cơ cấu & Pháp lý',
+      'Sản phẩm (Product)',
+    ];
+    
+    const categories = categoriesData || defaultCategories;
+    
+    console.log(`Retrieved ${categories.length} categories`);
+    
+    return c.json({
+      success: true,
+      categories: categories,
+    });
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return c.json({ 
+      error: "Error fetching categories: " + (error instanceof Error ? error.message : 'Unknown error') 
+    }, 500);
+  }
+});
+
+// Add a new category
+app.post("/make-server-f61d8c0d/categories", async (c) => {
+  try {
+    console.log('=== ADD NEW CATEGORY ===');
+    const body = await c.req.json();
+    const { category } = body;
+    
+    if (!category || !category.trim()) {
+      return c.json({ error: "Category name is required" }, 400);
+    }
+    
+    // Get existing categories
+    const categoriesData = await kv.get('strategy:categories');
+    const defaultCategories = [
+      'Brand Identity',
+      'Cơ cấu & Pháp lý',
+      'Sản phẩm (Product)',
+    ];
+    const categories = categoriesData || defaultCategories;
+    
+    // Check if category already exists
+    if (categories.includes(category.trim())) {
+      return c.json({ error: "Category already exists" }, 400);
+    }
+    
+    // Add new category
+    const updatedCategories = [...categories, category.trim()];
+    await kv.set('strategy:categories', updatedCategories);
+    
+    console.log(`Category "${category}" added successfully`);
+    
+    return c.json({
+      success: true,
+      message: "Category added successfully",
+      categories: updatedCategories,
+    });
+  } catch (error) {
+    console.error('Error adding category:', error);
+    return c.json({ 
+      error: "Error adding category: " + (error instanceof Error ? error.message : 'Unknown error') 
+    }, 500);
+  }
+});
+
 Deno.serve(app.fetch);

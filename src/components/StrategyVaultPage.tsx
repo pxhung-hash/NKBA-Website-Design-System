@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Target, Handshake, Users, Lock, Files, Paintbrush, GitMerge, Map, Eye, Share, Pencil, MonitorPlay, Menu as MenuIcon, BarChart3, Shield, Package, Settings as SettingsIcon, LogOut, Home, ExternalLink, Edit, Trash2, Plus, Search, Check, X } from 'lucide-react';
+import { Target, Handshake, Users, Lock, Files, Paintbrush, GitMerge, Map, Eye, Share, Pencil, MonitorPlay, Menu as MenuIcon, BarChart3, Shield, Package, Settings as SettingsIcon, LogOut, Home, ExternalLink, Edit, Trash2, Plus, Search, Check, X, Crown } from 'lucide-react';
 import { useAuth } from '../utils/AuthContext';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { StrategyVaultContent } from './StrategyVaultContent';
 
 interface StrategyVaultPageProps {
   onNavigate?: (page: string) => void;
@@ -22,38 +24,9 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [activeView, setActiveView] = useState<'overview' | 'table'>('table');
   const [activeNavItem, setActiveNavItem] = useState('dashboard');
-  const [strategies, setStrategies] = useState<Strategy[]>([
-    {
-      id: 'STR-001',
-      category: 'Brand Identity',
-      name: 'Bộ Nhận Diện Thương Hiệu',
-      version: '1.0',
-      createdDate: '2024-01-15',
-      updatedDate: '2024-03-10',
-      url: 'https://docs.google.com/document/d/example-brand-guidelines',
-      status: 'private',
-    },
-    {
-      id: 'STR-002',
-      category: 'Cơ cấu & Pháp lý',
-      name: 'Chiến Lược Chuyển Đổi',
-      version: '2.0',
-      createdDate: '2024-02-01',
-      updatedDate: '2024-03-12',
-      url: 'https://docs.google.com/document/d/example-transition-model',
-      status: 'published',
-    },
-    {
-      id: 'STR-003',
-      category: 'Sản phẩm (Product)',
-      name: 'Lộ Trình Sản Phẩm',
-      version: '0.9',
-      createdDate: '2024-02-20',
-      updatedDate: '2024-03-05',
-      url: 'https://docs.google.com/document/d/example-product-roadmap',
-      status: 'draft',
-    },
-  ]);
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [editingStrategy, setEditingStrategy] = useState<Strategy | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,11 +41,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
     url: '',
     status: 'draft',
   });
-  const [categories, setCategories] = useState<string[]>([
-    'Brand Identity',
-    'Cơ cấu & Pháp lý',
-    'Sản phẩm (Product)',
-  ]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [newCategoryInput, setNewCategoryInput] = useState('');
   const [showAddCategory, setShowAddCategory] = useState(false);
 
@@ -125,6 +94,61 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
     };
   }, []);
 
+  // Fetch strategies from Supabase
+  useEffect(() => {
+    const fetchStrategies = async () => {
+      try {
+        const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/strategies`, {
+          headers: {
+            Authorization: `Bearer ${publicAnonKey}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch strategies');
+        }
+
+        const data = await response.json();
+        console.log('Strategies response:', data);
+        setStrategies(data.strategies || []);
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error fetching strategies:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setIsLoading(false);
+      }
+    };
+
+    fetchStrategies();
+  }, []);
+
+  // Fetch categories from Supabase
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/categories`, {
+          headers: {
+            Authorization: `Bearer ${publicAnonKey}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch categories');
+        }
+
+        const data = await response.json();
+        console.log('Categories response:', data);
+        setCategories(data.categories || []);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+        // Use default categories if fetch fails
+        setCategories(['Brand Identity', 'Cơ cấu & Pháp lý', 'Sản phẩm (Product)']);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   const handleRevise = (strategy: Strategy) => {
     setEditingStrategy(strategy);
     // Open URL in new tab for revision
@@ -141,13 +165,36 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
     setEditForm(null);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editForm) {
-      setStrategies(strategies.map(s => 
-        s.id === editForm.id ? { ...editForm, updatedDate: new Date().toISOString().split('T')[0] } : s
-      ));
-      setEditingId(null);
-      setEditForm(null);
+      try {
+        const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/strategies/${editForm.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${publicAnonKey}`,
+          },
+          body: JSON.stringify(editForm),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update strategy');
+        }
+
+        const data = await response.json();
+        console.log('Strategy updated:', data);
+
+        // Update local state
+        setStrategies(strategies.map(s => 
+          s.id === data.strategy.id ? data.strategy : s
+        ));
+        setEditingId(null);
+        setEditForm(null);
+      } catch (err) {
+        console.error('Error updating strategy:', err);
+        alert('Không thể cập nhật chiến lược: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      }
     }
   };
 
@@ -157,9 +204,29 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
     }
   };
 
-  const handleDeleteStrategy = (id: string) => {
+  const handleDeleteStrategy = async (id: string) => {
     if (confirm('Bạn có chắc chắn muốn xóa chiến lược này?')) {
-      setStrategies(strategies.filter(s => s.id !== id));
+      try {
+        const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/strategies/${id}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${publicAnonKey}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete strategy');
+        }
+
+        console.log(`Strategy ${id} deleted successfully`);
+
+        // Update local state
+        setStrategies(strategies.filter(s => s.id !== id));
+      } catch (err) {
+        console.error('Error deleting strategy:', err);
+        alert('Không thể xóa chiến lược: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      }
     }
   };
 
@@ -184,37 +251,85 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
     setNewStrategy({ ...newStrategy, [field]: value });
   };
 
-  const handleCreateStrategy = () => {
+  const handleCreateStrategy = async () => {
     // Validate required fields
     if (!newStrategy.name.trim()) {
       alert('Vui lòng nhập tên chiến lược!');
       return;
     }
 
-    // Generate new ID
-    const maxId = strategies.reduce((max, s) => {
-      const num = parseInt(s.id.replace('STR-', ''));
-      return num > max ? num : max;
-    }, 0);
-    const newId = `STR-${String(maxId + 1).padStart(3, '0')}`;
+    try {
+      // Generate new ID
+      const maxId = strategies.reduce((max, s) => {
+        const num = parseInt(s.id.replace('STR-', ''));
+        return num > max ? num : max;
+      }, 0);
+      const newId = `STR-${String(maxId + 1).padStart(3, '0')}`;
 
-    const today = new Date().toISOString().split('T')[0];
-    const strategyToAdd: Strategy = {
-      id: newId,
-      ...newStrategy,
-      updatedDate: today,
-    };
+      const today = new Date().toISOString().split('T')[0];
+      const strategyToAdd: Strategy = {
+        id: newId,
+        ...newStrategy,
+        updatedDate: today,
+      };
 
-    setStrategies([...strategies, strategyToAdd]);
-    handleCloseNewStrategyModal();
-    setActiveView('table'); // Switch to table view to see the new strategy
+      // Save to database
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/strategies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify(strategyToAdd),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create strategy');
+      }
+
+      const data = await response.json();
+      console.log('Strategy created:', data);
+
+      // Update local state
+      setStrategies([...strategies, data.strategy]);
+      handleCloseNewStrategyModal();
+      setActiveView('table'); // Switch to table view to see the new strategy
+    } catch (err) {
+      console.error('Error creating strategy:', err);
+      alert('Không thể tạo chiến lược: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
   };
 
-  const handleAddNewCategory = () => {
+  const handleAddNewCategory = async () => {
     if (newCategoryInput.trim() && !categories.includes(newCategoryInput.trim())) {
-      setCategories([...categories, newCategoryInput.trim()]);
-      setNewCategoryInput('');
-      setShowAddCategory(false);
+      try {
+        // Save to database
+        const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/categories`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${publicAnonKey}`,
+          },
+          body: JSON.stringify({ category: newCategoryInput.trim() }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to add category');
+        }
+
+        const data = await response.json();
+        console.log('Category added:', data);
+
+        // Update local state
+        setCategories(data.categories);
+        setNewCategoryInput('');
+        setShowAddCategory(false);
+      } catch (err) {
+        console.error('Error adding category:', err);
+        alert('Không thể thêm category: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      }
     } else if (categories.includes(newCategoryInput.trim())) {
       alert('Category đã tồn tại!');
     } else {
@@ -223,9 +338,9 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
   };
 
   const filteredStrategies = strategies.filter(strategy =>
-    strategy.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    strategy.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    strategy.id.toLowerCase().includes(searchTerm.toLowerCase())
+    (strategy.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (strategy.category?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (strategy.id?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   const getStatusBadge = (status: string) => {
@@ -425,94 +540,104 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
 
           {activeView === 'overview' && (
             <>
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                {/* Stat 1 */}
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                  <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Target size={48} className="text-[#002D62]" />
-                  </div>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wide mb-1">Tiến độ Phase 1</p>
-                  <h3 className="text-2xl font-bold text-slate-800">85%</h3>
-                  <div className="w-full bg-slate-100 h-1.5 mt-3 rounded-full overflow-hidden">
-                    <div className="bg-[#002D62] h-full rounded-full" style={{ width: '85%' }}></div>
-                  </div>
-                  <p className="text-xs text-green-600 mt-2 font-medium">�� Đang đi đúng lộ trình</p>
-                </div>
+              {/* Render content based on active nav item */}
+              {(activeNavItem === 'dashboard' || activeNavItem === 'analytics') && (
+                <>
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    {/* Stat 1 */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                      <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Target size={48} className="text-[#002D62]" />
+                      </div>
+                      <p className="text-slate-500 text-xs font-bold uppercase tracking-wide mb-1">Tiến độ Phase 1</p>
+                      <h3 className="text-2xl font-bold text-slate-800">85%</h3>
+                      <div className="w-full bg-slate-100 h-1.5 mt-3 rounded-full overflow-hidden">
+                        <div className="bg-[#002D62] h-full rounded-full" style={{ width: '85%' }}></div>
+                      </div>
+                      <p className="text-xs text-green-600 mt-2 font-medium"> Đang đi đúng lộ trình</p>
+                    </div>
 
-                {/* Stat 2 */}
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                  <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Handshake size={48} className="text-[#BE0027]" />
-                  </div>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wide mb-1">Thương vụ Biz-Link</p>
-                  <h3 className="text-2xl font-bold text-slate-800">12 Active</h3>
-                  <p className="text-xs text-slate-400 mt-2">Tổng giá trị: <span className="text-slate-700 font-bold">Waiting...</span></p>
-                </div>
+                    {/* Stat 2 */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                      <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Handshake size={48} className="text-[#BE0027]" />
+                      </div>
+                      <p className="text-slate-500 text-xs font-bold uppercase tracking-wide mb-1">Thương vụ Biz-Link</p>
+                      <h3 className="text-2xl font-bold text-slate-800">12 Active</h3>
+                      <p className="text-xs text-slate-400 mt-2">Tổng giá trị: <span className="text-slate-700 font-bold">Waiting...</span></p>
+                    </div>
 
-                {/* Stat 3 */}
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                  <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Users size={48} className="text-blue-600" />
-                  </div>
-                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wide mb-1">Nhân sự Talent-Hub</p>
-                  <h3 className="text-2xl font-bold text-slate-800">45 Profiles</h3>
-                  <p className="text-xs text-slate-400 mt-2">Đã thẩm định: <span className="text-slate-700 font-bold">28</span></p>
-                </div>
+                    {/* Stat 3 */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                      <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Users size={48} className="text-blue-600" />
+                      </div>
+                      <p className="text-slate-500 text-xs font-bold uppercase tracking-wide mb-1">Nhân sự Talent-Hub</p>
+                      <h3 className="text-2xl font-bold text-slate-800">45 Profiles</h3>
+                      <p className="text-xs text-slate-400 mt-2">Đã thẩm định: <span className="text-slate-700 font-bold">28</span></p>
+                    </div>
 
-                {/* Stat 4 - Security */}
-                <div className="bg-slate-900 text-white p-5 rounded-xl border border-slate-800 shadow-sm relative overflow-hidden">
-                  <div className="absolute right-0 top-0 p-4 opacity-20">
-                    <Lock size={48} className="text-green-400" />
-                  </div>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-wide mb-1">Trạng thái Bảo mật</p>
-                  <h3 className="text-xl font-bold text-green-400 flex items-center gap-2">
-                    <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                    SECURE
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-2">Chống copy: <span className="text-white font-bold">BẬT</span></p>
-                </div>
-              </div>
-
-              {/* Preview Area */}
-              <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-[#002D62] flex items-center gap-2">
-                    <MonitorPlay size={20} /> Xem Nhanh: Cấu Trúc Hybrid
-                  </h3>
-                  <span className="text-xs font-bold text-[#BE0027] bg-red-50 px-2 py-1 rounded border border-red-100">
-                    CHẾ ĐỘ BẢO MẬT: ON
-                  </span>
-                </div>
-                
-                <div className="w-full h-64 bg-slate-100 rounded-lg relative overflow-hidden border border-slate-200 flex items-center justify-center">
-                  {/* Watermark */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                    <div className="text-4xl font-bold text-slate-300 opacity-20 -rotate-12" style={{ userSelect: 'none' }}>
-                      NKBA CONFIDENTIAL • ADMIN VIEW
+                    {/* Stat 4 - Security */}
+                    <div className="bg-slate-900 text-white p-5 rounded-xl border border-slate-800 shadow-sm relative overflow-hidden">
+                      <div className="absolute right-0 top-0 p-4 opacity-20">
+                        <Lock size={48} className="text-green-400" />
+                      </div>
+                      <p className="text-gray-400 text-xs font-bold uppercase tracking-wide mb-1">Trạng thái Bảo mật</p>
+                      <h3 className="text-xl font-bold text-green-400 flex items-center gap-2">
+                        <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                        SECURE
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-2">Chống copy: <span className="text-white font-bold">BẬT</span></p>
                     </div>
                   </div>
-                  
-                  {/* Content */}
-                  <div className="text-center z-10" style={{ userSelect: 'none', cursor: 'default' }}>
-                    <div className="flex items-center gap-8 opacity-80">
-                      <div className="bg-white p-4 rounded shadow border-t-4 border-[#002D62] w-32">
-                        <div className="text-2xl">🏛️</div>
-                        <div className="font-bold text-xs mt-2">ALLIANCE</div>
+
+                  {/* Preview Area */}
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-[#002D62] flex items-center gap-2">
+                        <MonitorPlay size={20} /> Xem Nhanh: Cấu Trúc Hybrid
+                      </h3>
+                      <span className="text-xs font-bold text-[#BE0027] bg-red-50 px-2 py-1 rounded border border-red-100">
+                        CHẾ ĐỘ BẢO MẬT: ON
+                      </span>
+                    </div>
+                    
+                    <div className="w-full h-64 bg-slate-100 rounded-lg relative overflow-hidden border border-slate-200 flex items-center justify-center">
+                      {/* Watermark */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
+                        <div className="text-4xl font-bold text-slate-300 opacity-20 -rotate-12" style={{ userSelect: 'none' }}>
+                          NKBA CONFIDENTIAL • ADMIN VIEW
+                        </div>
                       </div>
-                      <div className="text-2xl text-gray-400">🤝</div>
-                      <div className="bg-white p-4 rounded shadow border-t-4 border-[#BE0027] w-32">
-                        <div className="text-2xl">💼</div>
-                        <div className="font-bold text-xs mt-2">SERVICES JSC</div>
+                      
+                      {/* Content */}
+                      <div className="text-center z-10" style={{ userSelect: 'none', cursor: 'default' }}>
+                        <div className="flex items-center gap-8 opacity-80">
+                          <div className="bg-white p-4 rounded shadow border-t-4 border-[#002D62] w-32">
+                            <div className="text-2xl">🏛️</div>
+                            <div className="font-bold text-xs mt-2">ALLIANCE</div>
+                          </div>
+                          <div className="text-2xl text-gray-400">🤝</div>
+                          <div className="bg-white p-4 rounded shadow border-t-4 border-[#BE0027] w-32">
+                            <div className="text-2xl">💼</div>
+                            <div className="font-bold text-xs mt-2">SERVICES JSC</div>
+                          </div>
+                        </div>
+                        <p className="mt-4 text-sm text-slate-500 font-mono">Dữ liệu được bảo vệ. Không thể chuột phải.</p>
                       </div>
                     </div>
-                    <p className="mt-4 text-sm text-slate-500 font-mono">Dữ liệu được bảo vệ. Không thể chuột phải.</p>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
+              
+              {/* Render custom content for other nav items */}
+              {(activeNavItem !== 'dashboard' && activeNavItem !== 'analytics') && (
+                <StrategyVaultContent activeNavItem={activeNavItem} />
+              )}
             </>
           )}
 
