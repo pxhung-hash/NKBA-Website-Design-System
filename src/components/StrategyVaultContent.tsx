@@ -1,6 +1,8 @@
 import React from 'react';
 import { Target, Handshake, Users, Lock, Files, Shield, Package, GitMerge, Lightbulb, Crown, CheckCircle, Clock, UserPlus, Download, Fingerprint, TrendingUp, ShieldCheck, Paintbrush, Edit } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+// Thêm chữ Search vào trong ngoặc nhọn, hoặc thêm dòng mới này:
+import { Search } from 'lucide-react';
 
 interface ContentProps {
   activeNavItem: string;

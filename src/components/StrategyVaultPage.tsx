@@ -109,7 +109,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
         }
 
         const data = await response.json();
-        console.log('Strategies response:', data);
+        
         setStrategies(data.strategies || []);
         setIsLoading(false);
       } catch (err) {
@@ -137,7 +137,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
         }
 
         const data = await response.json();
-        console.log('Categories response:', data);
+        
         setCategories(data.categories || []);
       } catch (err) {
         console.error('Error fetching categories:', err);
@@ -183,7 +183,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
         }
 
         const data = await response.json();
-        console.log('Strategy updated:', data);
+        
 
         // Update local state
         setStrategies(strategies.map(s => 
@@ -260,10 +260,11 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
 
     try {
       // Generate new ID
-      const maxId = strategies.reduce((max, s) => {
-        const num = parseInt(s.id.replace('STR-', ''));
-        return num > max ? num : max;
-      }, 0);
+   
+const maxId = strategies.reduce((max, s) => {
+    const match = s.id?.match(/^STR-(\d+)$/); // Chỉ lấy những ID đúng chuẩn STR- số
+    return match ? Math.max(max, parseInt(match[1], 10)) : max;
+}, 0);
       const newId = `STR-${String(maxId + 1).padStart(3, '0')}`;
 
       const today = new Date().toISOString().split('T')[0];
@@ -291,10 +292,13 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
       const data = await response.json();
       console.log('Strategy created:', data);
 
+      // Use returned strategy if available; otherwise fall back to the one we just constructed
+      const addedStrategy = data.strategy && data.strategy.id ? data.strategy : strategyToAdd;
+
       // Update local state
-      setStrategies([...strategies, data.strategy]);
+      setStrategies([...strategies, addedStrategy]);
       handleCloseNewStrategyModal();
-      setActiveView('table'); // Switch to table view to see the new strategy
+      
     } catch (err) {
       console.error('Error creating strategy:', err);
       alert('Không thể tạo chiến lược: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -355,6 +359,86 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
         return null;
     }
   };
+
+  // Dev-only: run an integration test when visiting the app with ?runIntegrationTest=1 in development
+  React.useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('runIntegrationTest') !== '1') return;
+      if (process.env.NODE_ENV !== 'development') {
+        console.warn('Integration test skipped: not in development mode');
+        return;
+      }
+
+      // Run only once per page load
+      let ran = (window as any).__nkba_run_integration_test__;
+      if (ran) return;
+      (window as any).__nkba_run_integration_test__ = true;
+
+      (async () => {
+        console.log('Integration test: starting Strategy create flow (dev-only)');
+
+        // Prefill a valid new strategy
+        const testStrategy = {
+          category: categories?.[0] || 'Brand Identity',
+          name: 'INTEGRATION TEST - ' + Date.now(),
+          version: '1.0',
+          createdDate: new Date().toISOString().split('T')[0],
+          url: 'https://example.test',
+          status: 'draft',
+        };
+
+        setNewStrategy(testStrategy);
+        setShowNewStrategyModal(true);
+
+        // Monkey-patch fetch to return a fake success response for the strategies POST
+        const origFetch = (window as any).fetch;
+        (window as any).fetch = async (input: any, init?: any) => {
+          try {
+            const url = typeof input === 'string' ? input : input?.url || '';
+            if (url.includes('/strategies') && init?.method === 'POST') {
+              const body = init?.body ? JSON.parse(init.body) : testStrategy;
+              return {
+                ok: true,
+                json: async () => ({ strategy: { id: 'STR-999', ...body, updatedDate: new Date().toISOString().split('T')[0] } }),
+              } as any;
+            }
+            if (url.includes('/categories') && init?.method === 'POST') {
+              const body = init?.body ? JSON.parse(init.body) : {};
+              return {
+                ok: true,
+                json: async () => ({ categories: [...categories, body.category] }),
+              } as any;
+            }
+            // Fallback to original
+            return origFetch ? origFetch(input, init) : { ok: false, json: async () => ({}) } as any;
+          } catch (e) {
+            return { ok: false, json: async () => ({ error: e?.message || String(e) }) } as any;
+          }
+        };
+
+        // Wait briefly for modal to settle, then trigger create
+        await new Promise((r) => setTimeout(r, 400));
+        try {
+          await handleCreateStrategy();
+          console.log('Integration test: handleCreateStrategy completed');
+          // Wait a tick for state updates
+          await new Promise((r) => setTimeout(r, 200));
+          alert('Integration test finished: strategy created (check console)');
+        } catch (err) {
+          console.error('Integration test failed:', err);
+          alert('Integration test failed: ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+          // Restore fetch
+          (window as any).fetch = origFetch;
+          setShowNewStrategyModal(false);
+        }
+      })();
+    } catch (e) {
+      console.error('Integration test setup error:', e);
+    }
+  }, [categories, handleCreateStrategy, setNewStrategy, setShowNewStrategyModal]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-slate-50" style={{ userSelect: 'none' }}>
@@ -494,30 +578,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
               <h2 className="text-xl font-bold text-[#002D62]" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                 Strategy Overview
               </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setActiveView('overview')}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeView === 'overview'
-                      ? 'bg-[#002D62] text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Overview
-                </button>
-                <button
-                  onClick={() => setActiveView('table')}
-                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    activeView === 'table'
-                      ? 'bg-[#002D62] text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Table View
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
+             
               <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors border border-slate-300">
                 <Share size={16} /> Export .nkba
               </button>
@@ -538,7 +599,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
             }}
           />
 
-          {activeView === 'overview' && (
+     
             <>
               {/* Render content based on active nav item */}
               {(activeNavItem === 'dashboard' || activeNavItem === 'analytics') && (
@@ -639,7 +700,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
                 <StrategyVaultContent activeNavItem={activeNavItem} />
               )}
             </>
-          )}
+          
 
           {activeView === 'table' && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
