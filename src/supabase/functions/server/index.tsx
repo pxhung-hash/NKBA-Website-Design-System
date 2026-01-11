@@ -300,4 +300,85 @@ app.post("/make-server-f61d8c0d/auth/create-admin", async (c) => {
   }
 });
 
+// Create special strategy vault admin account
+app.post("/make-server-f61d8c0d/auth/create-vault-admin", async (c) => {
+  console.log('=== CREATE VAULT ADMIN ACCOUNT REQUEST ===');
+  try {
+    const vaultAdminEmail = "px.hung@nkba.vn";
+    const vaultAdminPassword = "admin123456!";
+    const vaultAdminName = "Phạm Xuân Hưng (Strategy Vault)";
+
+    // Create Supabase admin client
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('Creating vault admin user...');
+
+    // Check if vault admin already exists
+    const existingVaultAdmin = await kv.get(`user_by_email:${vaultAdminEmail}`);
+    if (existingVaultAdmin) {
+      console.log('Vault admin account already exists');
+      return c.json({ 
+        success: true, 
+        message: "Vault admin account already exists",
+        credentials: {
+          email: vaultAdminEmail,
+          password: vaultAdminPassword
+        }
+      });
+    }
+
+    // Create vault admin user with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: vaultAdminEmail,
+      password: vaultAdminPassword,
+      email_confirm: true,
+      user_metadata: {
+        name: vaultAdminName,
+        role: 'vault_admin',
+      },
+    });
+
+    if (authError) {
+      console.error('Auth error creating vault admin:', authError);
+      return c.json({ error: authError.message }, 400);
+    }
+
+    console.log('Vault admin user created in Supabase Auth:', authData.user.id);
+
+    // Store vault admin profile data in KV store
+    const userId = authData.user.id;
+    const vaultAdminData = {
+      id: userId,
+      name: vaultAdminName,
+      email: vaultAdminEmail,
+      company: 'NKBA - Strategy Division',
+      role: 'vault_admin',
+      createdAt: new Date().toISOString(),
+    };
+
+    await kv.set(`user:${userId}`, vaultAdminData);
+    await kv.set(`user_by_email:${vaultAdminEmail}`, userId);
+
+    console.log('✅ Vault admin account created successfully');
+
+    return c.json({
+      success: true,
+      message: "Vault admin account created successfully",
+      credentials: {
+        email: vaultAdminEmail,
+        password: vaultAdminPassword,
+        note: "This account has access to Strategy Vault"
+      },
+      user: {
+        id: userId,
+        email: vaultAdminEmail,
+        name: vaultAdminName,
+        role: 'vault_admin',
+      }
+    });
+  } catch (error) {
+    console.error('Create vault admin error:', error);
+    return c.json({ error: "Error creating vault admin account: " + (error instanceof Error ? error.message : 'Unknown error') }, 500);
+  }
+});
+
 Deno.serve(app.fetch);

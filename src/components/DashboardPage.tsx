@@ -6,6 +6,7 @@ import { ProjectLeadsPage } from './ProjectLeadsPage';
 import { MemberDirectoryPage } from './MemberDirectoryPage';
 import { MyProfilePage } from './MyProfilePage';
 import { SettingsPage } from './SettingsPage';
+import { StrategyVaultPage } from './StrategyVaultPage';
 import { CheckCircle, Calendar, TrendingUp, Bell, ExternalLink, LayoutDashboard, FolderKanban, Users, Settings } from 'lucide-react';
 
 interface DashboardPageProps {
@@ -240,6 +241,10 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
 
         {activeView === 'schedule' && (
           <BODSchedulePage onNavigate={() => {}} />
+        )}
+
+        {activeView === 'vault' && (
+          <StrategyVaultPage onNavigate={onNavigate} />
         )}
       </main>
     </div>

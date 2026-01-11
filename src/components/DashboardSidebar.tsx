@@ -1,5 +1,6 @@
 import React from 'react';
-import { LayoutDashboard, User, Users, Briefcase, UserPlus, Settings, LogOut, Menu, X, Calendar, Home } from 'lucide-react';
+import { LayoutDashboard, User, Users, Briefcase, UserPlus, Settings, LogOut, Menu, X, Calendar, Home, Shield } from 'lucide-react';
+import { useAuth } from '../utils/AuthContext';
 
 interface DashboardSidebarProps {
   activeView: string;
@@ -10,6 +11,7 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ activeView, onNavigateView, onLogout, onNavigateHome }: DashboardSidebarProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const { user } = useAuth();
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -20,6 +22,12 @@ export function DashboardSidebar({ activeView, onNavigateView, onLogout, onNavig
     { id: 'talent', label: 'Talent Pool', icon: UserPlus },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  // Add Strategy Vault only for px.hung@nkba.vn
+  const isVaultAdmin = user?.email === 'px.hung@nkba.vn';
+  if (isVaultAdmin) {
+    menuItems.push({ id: 'vault', label: 'Strategy Vault', icon: Shield });
+  }
 
   const SidebarContent = () => (
     <div className="h-full flex flex-col">

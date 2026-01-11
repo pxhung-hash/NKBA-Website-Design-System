@@ -11,14 +11,17 @@ interface AdminSetupProps {
 export function AdminSetup({ onNavigate }: AdminSetupProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [vaultResult, setVaultResult] = useState<any>(null);
   const [error, setError] = useState('');
 
   const createAdminAccount = async () => {
     setIsLoading(true);
     setError('');
     setResult(null);
+    setVaultResult(null);
 
     try {
+      // Create regular admin
       const response = await fetch(`${SERVER_URL}/auth/create-admin`, {
         method: 'POST',
         headers: {
@@ -34,9 +37,24 @@ export function AdminSetup({ onNavigate }: AdminSetupProps) {
       }
 
       setResult(data);
+
+      // Create vault admin
+      const vaultResponse = await fetch(`${SERVER_URL}/auth/create-vault-admin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+      });
+
+      const vaultData = await vaultResponse.json();
+
+      if (vaultResponse.ok) {
+        setVaultResult(vaultData);
+      }
     } catch (err: any) {
       console.error('Admin setup error:', err);
-      setError(err.message || 'Failed to create admin account');
+      setError(err.message || 'Failed to create admin accounts');
     } finally {
       setIsLoading(false);
     }
@@ -98,6 +116,41 @@ export function AdminSetup({ onNavigate }: AdminSetupProps) {
                           {result.credentials.note && (
                             <p className="text-orange-600 text-xs mt-2 font-medium">
                               ⚠️ {result.credentials.note}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {vaultResult && (
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="text-green-500 flex-shrink-0 mt-0.5" size={20} />
+                  <div className="flex-1">
+                    <p className="text-green-700 font-bold mb-2">{vaultResult.message}</p>
+                    {vaultResult.credentials && (
+                      <div className="bg-white p-4 mt-3 border border-green-200">
+                        <p className="text-sm font-bold text-gray-700 mb-2">Vault Admin Credentials:</p>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-gray-600">Email:</span>{' '}
+                            <code className="bg-gray-100 px-2 py-1 font-mono text-[#003366]">
+                              {vaultResult.credentials.email}
+                            </code>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Password:</span>{' '}
+                            <code className="bg-gray-100 px-2 py-1 font-mono text-[#003366]">
+                              {vaultResult.credentials.password}
+                            </code>
+                          </div>
+                          {vaultResult.credentials.note && (
+                            <p className="text-orange-600 text-xs mt-2 font-medium">
+                              ⚠️ {vaultResult.credentials.note}
                             </p>
                           )}
                         </div>
