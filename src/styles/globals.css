@@ -210,21 +210,3 @@ html {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-
-/* Showcase helpers */
-.hero-bg {
-  background-size: cover;
-  background-position: center;
-}
-
-.clip-path-slant {
-  clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
-}
-
-/* Simple NKBA utility classes using design tokens */
-.bg-nkba-navy { background-color: var(--nkba-navy); }
-.text-nkba-navy { color: var(--nkba-navy); }
-.bg-nkba-red { background-color: var(--nkba-red); }
-.text-nkba-gold { color: var(--nkba-gold); }
-.border-nkba-navy { border-color: var(--nkba-navy); }
-.border-nkba-gold { border-color: var(--nkba-gold); }

@@ -1,13 +1,14 @@
 import React from 'react';
-import { LayoutDashboard, User, Users, Briefcase, UserPlus, Settings, LogOut, Menu, X, Calendar } from 'lucide-react';
+import { LayoutDashboard, User, Users, Briefcase, UserPlus, Settings, LogOut, Menu, X, Calendar, Home } from 'lucide-react';
 
 interface DashboardSidebarProps {
   activeView: string;
   onNavigateView: (view: string) => void;
   onLogout: () => void;
+  onNavigateHome?: () => void;
 }
 
-export function DashboardSidebar({ activeView, onNavigateView, onLogout }: DashboardSidebarProps) {
+export function DashboardSidebar({ activeView, onNavigateView, onLogout, onNavigateHome }: DashboardSidebarProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
   const menuItems = [
@@ -55,14 +56,26 @@ export function DashboardSidebar({ activeView, onNavigateView, onLogout }: Dashb
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="p-6 border-t border-[#002244]">
+      {/* Back to Homepage & Logout */}
+      <div className="border-t border-[#002244]">
+        {onNavigateHome && (
+          <button
+            onClick={() => {
+              onNavigateHome();
+              setMobileOpen(false);
+            }}
+            className="w-full flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-[#004488] hover:text-white transition-colors"
+          >
+            <Home size={20} />
+            <span>Back to Homepage</span>
+          </button>
+        )}
         <button
           onClick={() => {
             onLogout();
             setMobileOpen(false);
           }}
-          className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:bg-[#990000] hover:text-white transition-colors"
+          className="w-full flex items-center space-x-3 px-6 py-3 text-gray-300 hover:bg-[#990000] hover:text-white transition-colors"
         >
           <LogOut size={20} />
           <span>Logout</span>

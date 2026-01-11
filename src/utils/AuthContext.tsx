@@ -5,103 +5,125 @@ interface User {
   id: string;
   email: string;
   name: string;
-  company?: string;
   role?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (user: User, accessToken: string) => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name: string, company: string, phone: string, position: string) => Promise<void>;
   logout: () => void;
-  checkAuth: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const SERVER_URL = `https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d`;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const checkAuth = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/auth/me`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      } else {
-        // Token invalid, clear it
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('user');
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Auth check error:', error);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Check for existing session on mount
   useEffect(() => {
-    checkAuth();
+    const checkSession = async () => {
+      const accessToken = localStorage.getItem('nkba_access_token');
+      if (accessToken) {
+        try {
+          const response = await fetch(`${SERVER_URL}/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+          } else {
+            localStorage.removeItem('nkba_access_token');
+          }
+        } catch (error) {
+          console.error('Session check error:', error);
+          localStorage.removeItem('nkba_access_token');
+        }
+      }
+      setIsLoading(false);
+    };
+
+    checkSession();
   }, []);
 
-  const login = (userData: User, accessToken: string) => {
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await fetch(`${SERVER_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Đăng nhập thất bại');
+      }
+
+      setUser(data.user);
+      localStorage.setItem('nkba_access_token', data.access_token);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
-  const logout = async () => {
+  const register = async (
+    email: string,
+    password: string,
+    name: string,
+    company: string,
+    phone: string,
+    position: string
+  ) => {
     try {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        await fetch(
-          `https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/auth/logout`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }
-        );
+      const response = await fetch(`${SERVER_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${publicAnonKey}`,
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          name,
+          company,
+          phone,
+          position,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Đăng ký thất bại');
       }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-      setUser(null);
+
+      setUser(data.user);
+      localStorage.setItem('nkba_access_token', data.access_token);
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      throw error;
     }
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('nkba_access_token');
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        logout,
-        checkAuth,
-      }}
-    >
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

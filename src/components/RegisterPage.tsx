@@ -1,106 +1,69 @@
 import React, { useState } from 'react';
-import { UserPlus, Lock, Mail, User, Building2, ArrowLeft } from 'lucide-react';
-import { projectId } from '../utils/supabase/info';
+import { UserPlus, Mail, Lock, User, Building2, Phone, Briefcase } from 'lucide-react';
+import { useAuth } from '../utils/AuthContext';
 
 interface RegisterPageProps {
-  onRegisterSuccess: () => void;
-  onNavigateToLogin: () => void;
+  onNavigate: (page: string) => void;
 }
 
-export function RegisterPage({ onRegisterSuccess, onNavigateToLogin }: RegisterPageProps) {
+export function RegisterPage({ onNavigate }: RegisterPageProps) {
+  const { register } = useAuth();
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
     password: '',
     confirmPassword: '',
+    name: '',
     company: '',
+    phone: '',
+    position: '',
   });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
+    setError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
-    // Validation
+    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       setError('Mật khẩu xác nhận không khớp');
-      setLoading(false);
       return;
     }
 
+    // Validate password length
     if (formData.password.length < 6) {
       setError('Mật khẩu phải có ít nhất 6 ký tự');
-      setLoading(false);
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/auth/register`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: formData.name,
-            email: formData.email,
-            password: formData.password,
-            company: formData.company,
-          }),
-        }
+      await register(
+        formData.email,
+        formData.password,
+        formData.name,
+        formData.company,
+        formData.phone,
+        formData.position
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('Registration failed:', data);
-        throw new Error(data.error || 'Đăng ký thất bại');
-      }
-
-      setSuccess(true);
-      setTimeout(() => {
-        onRegisterSuccess();
-      }, 2000);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Có lỗi xảy ra khi đăng ký';
-      setError(errorMessage);
+      // Redirect to dashboard on successful registration
+      onNavigate('dashboard');
+    } catch (err: any) {
       console.error('Registration error:', err);
+      setError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#003366] to-[#004488] flex items-center justify-center px-4 py-12">
-        <div className="max-w-md w-full">
-          <div className="bg-white shadow-2xl p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <UserPlus size={32} className="text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-              Đăng ký thành công!
-            </h2>
-            <p className="text-gray-600 mb-4">
-              Tài khoản của bạn đã được tạo. Đang chuyển đến trang đăng nhập...
-            </p>
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mx-auto"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#003366] to-[#004488] flex items-center justify-center px-4 py-12">
@@ -183,6 +146,38 @@ export function RegisterPage({ onRegisterSuccess, onNavigateToLogin }: RegisterP
             </div>
 
             <div>
+              <label htmlFor="phone" className="block text-sm font-bold text-gray-700 mb-2">
+                <Phone size={16} className="inline mr-2" />
+                Số điện thoại
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Số điện thoại (không bắt buộc)"
+                className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="position" className="block text-sm font-bold text-gray-700 mb-2">
+                <Briefcase size={16} className="inline mr-2" />
+                Chức vụ
+              </label>
+              <input
+                id="position"
+                type="text"
+                name="position"
+                value={formData.position}
+                onChange={handleChange}
+                placeholder="Chức vụ (không bắt buộc)"
+                className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all"
+              />
+            </div>
+
+            <div>
               <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-2">
                 <Lock size={16} className="inline mr-2" />
                 Mật khẩu
@@ -218,10 +213,10 @@ export function RegisterPage({ onRegisterSuccess, onNavigateToLogin }: RegisterP
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="w-full bg-[#990000] hover:bg-[#BB0000] text-white font-bold py-3 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? (
+              {isLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   Đang xử lý...
@@ -233,21 +228,16 @@ export function RegisterPage({ onRegisterSuccess, onNavigateToLogin }: RegisterP
                 </>
               )}
             </button>
-
-            <div className="pt-4 border-t border-gray-200">
-              <button
-                type="button"
-                onClick={onNavigateToLogin}
-                className="w-full text-[#003366] hover:text-[#004488] font-bold transition-colors flex items-center justify-center gap-2"
-              >
-                <ArrowLeft size={18} />
-                Quay lại đăng nhập
-              </button>
-            </div>
           </form>
         </div>
 
         <div className="mt-8 text-center text-gray-200 text-xs">
+          <button
+            onClick={() => onNavigate('home')}
+            className="text-gray-300 hover:text-white transition-colors mb-2 text-sm"
+          >
+            ← Back to Homepage
+          </button>
           <p>&copy; 2026 NKBA Corp. All rights reserved.</p>
           <p className="mt-1">Internal Use Only</p>
         </div>
