@@ -3,6 +3,7 @@ import { Header } from './Header';
 import { Footer } from './Footer';
 import { NKBAButton } from './NKBAButton';
 import { Building2, Users, TrendingUp } from 'lucide-react';
+import { NKBAShowcase } from './NKBAShowcase';
 
 interface HomePageProps {
   onNavigate: (page: string) => void;
@@ -13,6 +14,11 @@ export function HomePage({ onNavigate, isAuthenticated }: HomePageProps) {
   return (
     <div className="min-h-screen flex flex-col">
       <Header onNavigate={onNavigate} isAuthenticated={isAuthenticated} />
+
+      {/* Added: NKBA Showcase (converted from provided HTML) */}
+      <div className="mt-16">
+        <NKBAShowcase />
+      </div>
 
       {/* Hero Section */}
       <section
