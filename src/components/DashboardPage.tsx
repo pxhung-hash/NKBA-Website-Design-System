@@ -1,14 +1,27 @@
 import React from 'react';
 import { DashboardSidebar } from './DashboardSidebar';
 import { BODSchedulePage } from './BODSchedulePage';
+import { TalentPoolPage } from './TalentPoolPage';
+import { ProjectLeadsPage } from './ProjectLeadsPage';
+import { MemberDirectoryPage } from './MemberDirectoryPage';
+import { MyProfilePage } from './MyProfilePage';
+import { SettingsPage } from './SettingsPage';
 import { CheckCircle, Calendar, TrendingUp, Bell, ExternalLink, LayoutDashboard, FolderKanban, Users, Settings } from 'lucide-react';
 
 interface DashboardPageProps {
-  onLogout: () => void;
+  onNavigate: (page: string) => void;
 }
 
-export function DashboardPage({ onLogout }: DashboardPageProps) {
+export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const [activeView, setActiveView] = React.useState('dashboard');
+
+  const handleLogout = () => {
+    onNavigate('home');
+  };
+
+  const handleBackToHome = () => {
+    onNavigate('home');
+  };
 
   const projectLeads = [
     {
@@ -75,7 +88,8 @@ export function DashboardPage({ onLogout }: DashboardPageProps) {
       <DashboardSidebar
         activeView={activeView}
         onNavigateView={setActiveView}
-        onLogout={onLogout}
+        onLogout={handleLogout}
+        onNavigateHome={handleBackToHome}
       />
 
       {/* Main Content */}
@@ -205,38 +219,23 @@ export function DashboardPage({ onLogout }: DashboardPageProps) {
         )}
 
         {activeView === 'profile' && (
-          <div className="bg-white p-8 nkba-shadow">
-            <h2 className="text-2xl section-title text-[#003366] mb-6">My Profile</h2>
-            <p className="text-gray-600">Profile management features coming soon...</p>
-          </div>
+          <MyProfilePage />
         )}
 
         {activeView === 'directory' && (
-          <div className="bg-white p-8 nkba-shadow">
-            <h2 className="text-2xl section-title text-[#003366] mb-6">Member Directory</h2>
-            <p className="text-gray-600">Member directory will be displayed here...</p>
-          </div>
+          <MemberDirectoryPage />
         )}
 
         {activeView === 'projects' && (
-          <div className="bg-white p-8 nkba-shadow">
-            <h2 className="text-2xl section-title text-[#003366] mb-6">Project Leads</h2>
-            <p className="text-gray-600">Full project leads list coming soon...</p>
-          </div>
+          <ProjectLeadsPage />
         )}
 
         {activeView === 'talent' && (
-          <div className="bg-white p-8 nkba-shadow">
-            <h2 className="text-2xl section-title text-[#003366] mb-6">Talent Pool</h2>
-            <p className="text-gray-600">Talent pool features coming soon...</p>
-          </div>
+          <TalentPoolPage />
         )}
 
         {activeView === 'settings' && (
-          <div className="bg-white p-8 nkba-shadow">
-            <h2 className="text-2xl section-title text-[#003366] mb-6">Settings</h2>
-            <p className="text-gray-600">Account settings coming soon...</p>
-          </div>
+          <SettingsPage />
         )}
 
         {activeView === 'schedule' && (

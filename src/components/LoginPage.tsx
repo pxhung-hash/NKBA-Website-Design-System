@@ -1,54 +1,42 @@
 import React, { useState } from 'react';
-import { LogIn, UserPlus, Lock, Mail, User, Building2 } from 'lucide-react';
-import { projectId } from '../utils/supabase/info';
+import { LogIn, Mail, Lock } from 'lucide-react';
+import { useAuth } from '../utils/AuthContext';
 
 interface LoginPageProps {
-  onLogin: (user: { id: string; email: string; name: string }) => void;
-  onNavigateToRegister: () => void;
+  onNavigate: (page: string) => void;
 }
 
-export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export function LoginPage({ onNavigate }: LoginPageProps) {
+  const { login } = useAuth();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+    setError('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+    setIsLoading(true);
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-f61d8c0d/auth/login`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, password }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error('Login failed:', data);
-        throw new Error(data.error || 'Đăng nhập thất bại');
-      }
-
-      // Store access token
-      localStorage.setItem('access_token', data.access_token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // Call onLogin with user data
-      onLogin(data.user);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Có lỗi xảy ra khi đăng nhập';
-      setError(errorMessage);
+      await login(formData.email, formData.password);
+      // Redirect to dashboard on successful login
+      onNavigate('dashboard');
+    } catch (err: any) {
       console.error('Login error:', err);
+      setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -90,8 +78,9 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
               <input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
                 required
                 placeholder="your.email@example.com"
                 className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all"
@@ -106,8 +95,9 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
               <input
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
                 required
                 placeholder="••••••••"
                 className="w-full px-4 py-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#003366] focus:border-transparent transition-all"
@@ -116,10 +106,10 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isLoading}
               className="w-full bg-[#003366] hover:bg-[#004488] text-white font-bold py-3 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? (
+              {isLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                   Đang xử lý...
@@ -137,10 +127,22 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
                 Chưa có tài khoản?{' '}
                 <button
                   type="button"
-                  onClick={onNavigateToRegister}
+                  onClick={() => onNavigate('register')}
                   className="text-[#990000] hover:text-[#BB0000] font-bold transition-colors"
                 >
                   Đăng ký ngay
+                </button>
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <p className="text-center text-gray-500 text-xs">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('admin-setup')}
+                  className="text-[#003366] hover:text-[#004488] transition-colors"
+                >
+                  Admin Setup
                 </button>
               </p>
             </div>
@@ -148,6 +150,12 @@ export function LoginPage({ onLogin, onNavigateToRegister }: LoginPageProps) {
         </div>
 
         <div className="mt-8 text-center text-gray-200 text-xs">
+          <button
+            onClick={() => onNavigate('home')}
+            className="text-gray-300 hover:text-white transition-colors mb-2 text-sm"
+          >
+            ← Back to Homepage
+          </button>
           <p>&copy; 2026 NKBA Corp. All rights reserved.</p>
           <p className="mt-1">Internal Use Only</p>
         </div>

@@ -4,40 +4,24 @@ import { DashboardPage } from './components/DashboardPage';
 import { PublicMemberDirectory } from './components/PublicMemberDirectory';
 import { LoginPage } from './components/LoginPage';
 import { RegisterPage } from './components/RegisterPage';
+import { AdminSetup } from './components/AdminSetup';
 import { AuthProvider, useAuth } from './utils/AuthContext';
 import { projectId, publicAnonKey } from './utils/supabase/info';
 
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<'home' | 'dashboard' | 'directory' | 'login' | 'register'>('home');
-  const { user, isAuthenticated, isLoading, login, logout } = useAuth();
+  const [currentPage, setCurrentPage] = useState<'home' | 'dashboard' | 'directory' | 'login' | 'register' | 'admin-setup'>('home');
+  const { user, isLoading } = useAuth();
 
   const handleNavigate = (page: string) => {
     // Check if trying to access protected pages
-    if ((page === 'dashboard') && !isAuthenticated) {
+    if ((page === 'dashboard') && !user) {
       setCurrentPage('login');
       return;
     }
     
-    if (page === 'home' || page === 'dashboard' || page === 'directory' || page === 'login' || page === 'register') {
-      setCurrentPage(page);
+    if (page === 'home' || page === 'dashboard' || page === 'directory' || page === 'login' || page === 'register' || page === 'admin-setup') {
+      setCurrentPage(page as any);
     }
-  };
-
-  const handleLogin = async (userData: { id: string; email: string; name: string }) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      login(userData, token);
-      setCurrentPage('dashboard');
-    }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    setCurrentPage('home');
-  };
-
-  const handleRegisterSuccess = () => {
-    setCurrentPage('login');
   };
 
   // Show loading spinner while checking authentication
@@ -53,17 +37,13 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen">
-      {currentPage === 'home' && <HomePage onNavigate={handleNavigate} isAuthenticated={isAuthenticated} />}
-      {currentPage === 'dashboard' && isAuthenticated && <DashboardPage onLogout={handleLogout} />}
+    <div>
+      {currentPage === 'home' && <HomePage onNavigate={handleNavigate} isAuthenticated={!!user} />}
+      {currentPage === 'dashboard' && <DashboardPage onNavigate={handleNavigate} />}
       {currentPage === 'directory' && <PublicMemberDirectory onNavigate={handleNavigate} />}
-      {currentPage === 'login' && <LoginPage onLogin={handleLogin} onNavigateToRegister={() => setCurrentPage('register')} />}
-      {currentPage === 'register' && <RegisterPage onRegisterSuccess={handleRegisterSuccess} onNavigateToLogin={() => setCurrentPage('login')} />}
-      
-      {/* Redirect to login if trying to access protected page without auth */}
-      {currentPage === 'dashboard' && !isAuthenticated && (
-        <LoginPage onLogin={handleLogin} onNavigateToRegister={() => setCurrentPage('register')} />
-      )}
+      {currentPage === 'login' && <LoginPage onNavigate={handleNavigate} />}
+      {currentPage === 'register' && <RegisterPage onNavigate={handleNavigate} />}
+      {currentPage === 'admin-setup' && <AdminSetup onNavigate={handleNavigate} />}
     </div>
   );
 }

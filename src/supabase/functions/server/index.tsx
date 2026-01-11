@@ -84,9 +84,31 @@ app.post("/make-server-f61d8c0d/auth/register", async (c) => {
 
     console.log(`User registered successfully: ${email}`);
 
+    // Sign in the user to get access token
+    const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: signInData, error: signInError } = await supabaseAnon.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (signInError || !signInData.session) {
+      console.error('Auto-login error after registration:', signInError);
+      // Return success but without access token
+      return c.json({
+        success: true,
+        message: "Đăng ký thành công. Vui lòng đăng nhập.",
+        user: {
+          id: userId,
+          email: email,
+          name: name,
+        },
+      });
+    }
+
     return c.json({
       success: true,
       message: "Đăng ký thành công",
+      access_token: signInData.session.access_token,
       user: {
         id: userId,
         email: email,
@@ -194,6 +216,87 @@ app.post("/make-server-f61d8c0d/auth/logout", async (c) => {
   } catch (error) {
     console.error('Logout error:', error);
     return c.json({ error: "Có lỗi xảy ra khi đăng xuất" }, 500);
+  }
+});
+
+// Create admin account (one-time setup endpoint)
+app.post("/make-server-f61d8c0d/auth/create-admin", async (c) => {
+  console.log('=== CREATE ADMIN ACCOUNT REQUEST ===');
+  try {
+    const adminEmail = "admin@nkba.vn";
+    const adminPassword = "admin123456";
+    const adminName = "NKBA Administrator";
+
+    // Create Supabase admin client
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('Creating admin user...');
+
+    // Check if admin already exists
+    const existingAdmin = await kv.get(`user_by_email:${adminEmail}`);
+    if (existingAdmin) {
+      console.log('Admin account already exists');
+      return c.json({ 
+        success: true, 
+        message: "Admin account already exists",
+        credentials: {
+          email: adminEmail,
+          password: adminPassword
+        }
+      });
+    }
+
+    // Create admin user with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: adminEmail,
+      password: adminPassword,
+      email_confirm: true, // Auto-confirm email
+      user_metadata: {
+        name: adminName,
+        role: 'admin',
+      },
+    });
+
+    if (authError) {
+      console.error('Auth error creating admin:', authError);
+      return c.json({ error: authError.message }, 400);
+    }
+
+    console.log('Admin user created in Supabase Auth:', authData.user.id);
+
+    // Store admin profile data in KV store
+    const userId = authData.user.id;
+    const adminData = {
+      id: userId,
+      name: adminName,
+      email: adminEmail,
+      company: 'NKBA',
+      role: 'admin',
+      createdAt: new Date().toISOString(),
+    };
+
+    await kv.set(`user:${userId}`, adminData);
+    await kv.set(`user_by_email:${adminEmail}`, userId);
+
+    console.log('✅ Admin account created successfully');
+
+    return c.json({
+      success: true,
+      message: "Admin account created successfully",
+      credentials: {
+        email: adminEmail,
+        password: adminPassword,
+        note: "Please change the password after first login"
+      },
+      user: {
+        id: userId,
+        email: adminEmail,
+        name: adminName,
+        role: 'admin',
+      }
+    });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    return c.json({ error: "Error creating admin account: " + (error instanceof Error ? error.message : 'Unknown error') }, 500);
   }
 });
 
