@@ -59,6 +59,22 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Strategy | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showNewStrategyModal, setShowNewStrategyModal] = useState(false);
+  const [newStrategy, setNewStrategy] = useState<Omit<Strategy, 'id' | 'updatedDate'>>({
+    category: 'Brand Identity',
+    name: '',
+    version: '1.0',
+    createdDate: new Date().toISOString().split('T')[0],
+    url: '',
+    status: 'draft',
+  });
+  const [categories, setCategories] = useState<string[]>([
+    'Brand Identity',
+    'Cơ cấu & Pháp lý',
+    'Sản phẩm (Product)',
+  ]);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [showAddCategory, setShowAddCategory] = useState(false);
 
   // Check access rights
   if (!user || user.email !== 'px.hung@nkba.vn') {
@@ -144,6 +160,65 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
   const handleDeleteStrategy = (id: string) => {
     if (confirm('Bạn có chắc chắn muốn xóa chiến lược này?')) {
       setStrategies(strategies.filter(s => s.id !== id));
+    }
+  };
+
+  const handleOpenNewStrategyModal = () => {
+    setShowNewStrategyModal(true);
+  };
+
+  const handleCloseNewStrategyModal = () => {
+    setShowNewStrategyModal(false);
+    // Reset form
+    setNewStrategy({
+      category: 'Brand Identity',
+      name: '',
+      version: '1.0',
+      createdDate: new Date().toISOString().split('T')[0],
+      url: '',
+      status: 'draft',
+    });
+  };
+
+  const handleNewStrategyChange = (field: keyof Omit<Strategy, 'id' | 'updatedDate'>, value: string) => {
+    setNewStrategy({ ...newStrategy, [field]: value });
+  };
+
+  const handleCreateStrategy = () => {
+    // Validate required fields
+    if (!newStrategy.name.trim()) {
+      alert('Vui lòng nhập tên chiến lược!');
+      return;
+    }
+
+    // Generate new ID
+    const maxId = strategies.reduce((max, s) => {
+      const num = parseInt(s.id.replace('STR-', ''));
+      return num > max ? num : max;
+    }, 0);
+    const newId = `STR-${String(maxId + 1).padStart(3, '0')}`;
+
+    const today = new Date().toISOString().split('T')[0];
+    const strategyToAdd: Strategy = {
+      id: newId,
+      ...newStrategy,
+      updatedDate: today,
+    };
+
+    setStrategies([...strategies, strategyToAdd]);
+    handleCloseNewStrategyModal();
+    setActiveView('table'); // Switch to table view to see the new strategy
+  };
+
+  const handleAddNewCategory = () => {
+    if (newCategoryInput.trim() && !categories.includes(newCategoryInput.trim())) {
+      setCategories([...categories, newCategoryInput.trim()]);
+      setNewCategoryInput('');
+      setShowAddCategory(false);
+    } else if (categories.includes(newCategoryInput.trim())) {
+      alert('Category đã tồn tại!');
+    } else {
+      alert('Vui lòng nhập tên category!');
     }
   };
 
@@ -331,7 +406,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
               <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors border border-slate-300">
                 <Share size={16} /> Export .nkba
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-[#BE0027] hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors shadow-md">
+              <button className="flex items-center gap-2 px-4 py-2 bg-[#BE0027] hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors shadow-md" onClick={handleOpenNewStrategyModal}>
                 <Plus size={16} /> Tạo Chiến Lược Mới
               </button>
             </div>
@@ -362,7 +437,7 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
                   <div className="w-full bg-slate-100 h-1.5 mt-3 rounded-full overflow-hidden">
                     <div className="bg-[#002D62] h-full rounded-full" style={{ width: '85%' }}></div>
                   </div>
-                  <p className="text-xs text-green-600 mt-2 font-medium">▲ Đang đi đúng lộ trình</p>
+                  <p className="text-xs text-green-600 mt-2 font-medium">�� Đang đi đúng lộ trình</p>
                 </div>
 
                 {/* Stat 2 */}
@@ -496,9 +571,9 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
                                 className="w-full px-2 py-1 border border-[#002D62] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#002D62]"
                                 style={{ userSelect: 'auto' }}
                               >
-                                <option>Brand Identity</option>
-                                <option>Cơ cấu & Pháp lý</option>
-                                <option>Sản phẩm (Product)</option>
+                                {categories.map((cat) => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
                               </select>
                             ) : (
                               <span className="text-slate-600">{currentData.category}</span>
@@ -647,6 +722,140 @@ export function StrategyVaultPage({ onNavigate }: StrategyVaultPageProps) {
           )}
         </div>
       </main>
+
+      {/* New Strategy Modal */}
+      {showNewStrategyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" style={{ userSelect: 'auto' }}>
+          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-[#002D62] mb-4">Tạo Chiến Lược Mới</h2>
+            <form onSubmit={(e) => { e.preventDefault(); handleCreateStrategy(); }}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <div className="flex gap-2">
+                  <select
+                    value={newStrategy.category}
+                    onChange={(e) => handleNewStrategyChange('category', e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#002D62]"
+                    style={{ userSelect: 'auto' }}
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCategory(!showAddCategory)}
+                    className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors border border-slate-300"
+                    title="Add new category"
+                  >
+                    <Plus size={20} />
+                  </button>
+                </div>
+                
+                {/* Add Category Input */}
+                {showAddCategory && (
+                  <div className="mt-2 p-3 bg-slate-50 rounded-md border border-slate-200">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Tên Category Mới</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newCategoryInput}
+                        onChange={(e) => setNewCategoryInput(e.target.value)}
+                        placeholder="Nhập tên category..."
+                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-[#002D62]"
+                        style={{ userSelect: 'auto' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddNewCategory}
+                        className="px-3 py-1.5 bg-[#002D62] hover:bg-[#001f45] text-white rounded text-sm transition-colors"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowAddCategory(false); setNewCategoryInput(''); }}
+                        className="px-3 py-1.5 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded text-sm transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Name Strategy</label>
+                <input
+                  type="text"
+                  value={newStrategy.name}
+                  onChange={(e) => handleNewStrategyChange('name', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#002D62]"
+                  style={{ userSelect: 'auto' }}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Version</label>
+                <input
+                  type="text"
+                  value={newStrategy.version}
+                  onChange={(e) => handleNewStrategyChange('version', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#002D62]"
+                  style={{ userSelect: 'auto' }}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Created Date</label>
+                <input
+                  type="date"
+                  value={newStrategy.createdDate}
+                  onChange={(e) => handleNewStrategyChange('createdDate', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#002D62]"
+                  style={{ userSelect: 'auto' }}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">URL</label>
+                <input
+                  type="url"
+                  value={newStrategy.url}
+                  onChange={(e) => handleNewStrategyChange('url', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#002D62]"
+                  placeholder="https://..."
+                  style={{ userSelect: 'auto' }}
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Status</label>
+                <select
+                  value={newStrategy.status}
+                  onChange={(e) => handleNewStrategyChange('status', e.target.value as Strategy['status'])}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#002D62]"
+                  style={{ userSelect: 'auto' }}
+                >
+                  <option value="published">Published</option>
+                  <option value="draft">Draft</option>
+                  <option value="private">Private</option>
+                </select>
+              </div>
+              <div className="flex justify-end gap-4 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCloseNewStrategyModal}
+                  className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-[#BE0027] hover:bg-red-700 text-white rounded-lg transition-colors"
+                >
+                  Tạo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
